@@ -1,10 +1,10 @@
 name: Build and Release Android APK
 
 on:
-  workflow_dispatch: # Allows manual trigger from GitHub UI
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,44 +17,48 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
           version: 9
 
-      - name: Setup Java JDK
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Android Native Project (Expo Prebuild)
+        run: npx expo prebuild --platform android --clean
 
       - name: Build Android Debug APK
         run: |
           cd android
           chmod +x gradlew
+          export GRADLE_OPTS="-Xmx4096m -Dfile.encoding=UTF-8"
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: yourbrand-app-debug.apk
+          name: deducia-app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
-          tag_name: v1.0.0
-          name: "YourBrand Social v1.0.0"
-          body: "Download and install the APK on your Android device."
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: "Deducia Social v1.0.0 (Build ${{ github.run_number }})"
+          body: "Direct APK download for Android. Built with native package identifier `com.deducia.social`."
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
