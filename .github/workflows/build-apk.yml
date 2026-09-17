@@ -14,10 +14,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24'
+
+      - name: Setup pnpm 11
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.23.0 --activate || npm install -g pnpm@latest --force
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -29,27 +34,17 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Detect Package Manager and Install Dependencies
+      - name: Ensure Workspace Integrity
         run: |
-          if [ -f "yarn.lock" ]; then
-            echo "Detected yarn.lock — installing with Yarn"
-            yarn install --network-timeout 100000
-          elif [ -f "pnpm-lock.yaml" ]; then
-            echo "Detected pnpm-lock.yaml — installing with pnpm"
-            npx pnpm install --no-frozen-lockfile
-          elif [ -f "package-lock.json" ]; then
-            echo "Detected package-lock.json — installing with npm"
-            npm install --legacy-peer-deps
-          else
-            echo "No lockfile detected — installing with npm default"
-            npm install --legacy-peer-deps
+          if [ -f "pnpm-workspace.yaml" ]; then
+            grep -q "packages:" pnpm-workspace.yaml || echo -e "packages:\n  - '.'" >> pnpm-workspace.yaml
           fi
 
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
       - name: Generate Android Native Project
-        run: |
-          if [ ! -d "android" ]; then
-            npx expo prebuild --platform android --clean
-          fi
+        run: npx expo prebuild --platform android --clean
 
       - name: Build Android Debug APK
         run: |
