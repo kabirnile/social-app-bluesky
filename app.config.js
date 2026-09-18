@@ -53,7 +53,6 @@ module.exports = function (_config) {
       name: 'Deducia',
       slug: 'deducia',
       scheme: 'deducia',
-      // 'owner' removed to prevent EAS unauthorized-account build errors
       runtimeVersion: {
         policy: 'appVersion',
       },
@@ -187,25 +186,6 @@ module.exports = function (_config) {
         checkAutomatically: 'NEVER',
       },
       plugins: [
-        [
-          'expo-dev-client',
-          {
-            toolsButton: false,
-            ...(IS_E2E
-              ? {
-                  launchMode: 'most-recent',
-                  skipOnboarding: true,
-                  showMenuAtLaunch: false,
-                  ios: {
-                    defaultLaunchURL: 'http://localhost:8081',
-                  },
-                  android: {
-                    defaultLaunchURL: 'http://10.0.2.2:8081',
-                  },
-                }
-              : {}),
-          },
-        ],
         'expo-video',
         'expo-localization',
         'expo-web-browser',
@@ -423,4 +403,5 @@ module.exports = function (_config) {
       },
     },
   }
+  
 }
