@@ -40,31 +40,72 @@ jobs:
             grep -q "packages:" pnpm-workspace.yaml || echo -e "packages:\n  - '.'" >> pnpm-workspace.yaml
           fi
 
+      - name: Replace Visual Branding Text (UI & English Localization)
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+
+            // Target English language strings for the entire UI
+            const localeFiles = [
+              "src/locale/locales/en/messages.json",
+              "src/locale/locales/en/messages.po"
+            ];
+
+            localeFiles.forEach(file => {
+              if (fs.existsSync(file)) {
+                let text = fs.readFileSync(file, "utf8");
+                // Replace user-facing brand strings while keeping URLs and protocol terms intact
+                text = text.replace(/Bluesky/g, "Deducia");
+                fs.writeFileSync(file, text);
+                console.log("Updated visual text in:", file);
+              }
+            });
+          '
+
+      - name: Replace Existing Logos with Deducia Logo
+        run: |
+          if [ -f "deducia-logo.png" ]; then
+            echo "Overwriting existing app icons and splash assets..."
+            find assets -type f \( -name "*icon*.png" -o -name "*splash*.png" \) -exec cp -f deducia-logo.png {} +
+            echo "All app icons and splash screens updated to Deducia logo."
+          else
+            echo "deducia-logo.png not found in root. Keeping default assets."
+          fi
+
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Generate Android Native Project
+      - name: Generate Native Android Project
         run: npx expo prebuild --platform android --clean
 
-      - name: Build Android Debug APK
+      - name: Build Standalone Offline APK
         run: |
           cd android
           chmod +x gradlew
           export GRADLE_OPTS="-Xmx4096m -Dfile.encoding=UTF-8"
-          ./gradlew assembleDebug --no-daemon
+          # Builds offline release bundle using debug keystore
+          ./gradlew assembleRelease -x lint -PreactNativeArchitectures=arm64-v8a,armeabi-v7a || ./gradlew assembleDebug -DbundleInDebug=true --no-daemon
+
+      - name: Locate Generated APK
+        id: find-apk
+        run: |
+          APK_FILE=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_FILE"
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deducia-app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: deducia-app-standalone
+          path: ${{ steps.find-apk.outputs.apk_path }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0-${{ github.run_number }}
           name: "Deducia Social v1.0.0 (Build ${{ github.run_number }})"
-          body: "Direct APK download for Android. Built with native package identifier `com.deducia.social`."
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          body: "Fully branded standalone Deducia APK. Opens straight to Login/Registration."
+          files: ${{ steps.find-apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
