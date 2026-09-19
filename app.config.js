@@ -7,18 +7,8 @@ const pkg = require('./package.json')
  * @returns {{ expo: import('@expo/config-types').ExpoConfig }}
  */
 module.exports = function (_config) {
-  /**
-   * App version number. Should be incremented as part of a release cycle.
-   */
   const VERSION = pkg.version
-
-  /**
-   * Uses built-in Expo env vars
-   *
-   * @see https://docs.expo.dev/build-reference/variables/#built-in-environment-variables
-   */
   const PLATFORM = process.env.EAS_BUILD_PLATFORM ?? 'web'
-
   const IS_TESTFLIGHT = process.env.EXPO_PUBLIC_ENV === 'testflight'
   const IS_PRODUCTION = process.env.EXPO_PUBLIC_ENV === 'production'
   const IS_E2E = process.env.EXPO_PUBLIC_ENV === 'e2e'
@@ -32,9 +22,7 @@ module.exports = function (_config) {
     ...(IS_DEV || IS_TESTFLIGHT ? [] : []),
   ]
 
-  // Disabled so the app does not attempt to fetch Bluesky's signed production OTA bundles
   const UPDATES_ENABLED = false
-
   const USE_SENTRY = Boolean(process.env.SENTRY_AUTH_TOKEN)
 
   const IOS_ICON_FILE =
@@ -44,7 +32,6 @@ module.exports = function (_config) {
         ? './assets/app-icons/ios_icon_testflight.icon'
         : './assets/app-icons/ios_icon_default.icon'
 
-  // Verify google-services.json exists to avoid Android Gradle build failures
   const HAS_GOOGLE_SERVICES = fs.existsSync('./google-services.json')
 
   return {
@@ -58,7 +45,7 @@ module.exports = function (_config) {
       },
       icon: './assets/app-icons/ios_icon_default_next.png',
       userInterfaceStyle: 'automatic',
-      primaryColor: '#006AFF',
+      primaryColor: '#000000',
       ios: {
         supportsTablet: false,
         bundleIdentifier: 'com.deducia.social',
@@ -146,13 +133,14 @@ module.exports = function (_config) {
       },
       androidStatusBar: {
         barStyle: 'light-content',
+        backgroundColor: '#000000',
       },
       android: {
         icon: './assets/app-icons/android_icon_default_next.png',
         adaptiveIcon: {
           foregroundImage: './assets/icon-android-foreground.png',
           monochromeImage: './assets/icon-android-monochrome.png',
-          backgroundColor: '#006AFF',
+          backgroundColor: '#000000',
         },
         ...(HAS_GOOGLE_SERVICES ? { googleServicesFile: './google-services.json' } : {}),
         package: 'com.deducia.social',
@@ -233,7 +221,7 @@ module.exports = function (_config) {
           'expo-notifications',
           {
             icon: './assets/icon-android-notification.png',
-            color: '#1185fe',
+            color: '#000000',
             sounds: PLATFORM === 'ios' ? ['assets/dm.aiff'] : ['assets/dm.mp3'],
           },
         ],
@@ -258,7 +246,6 @@ module.exports = function (_config) {
             fonts: [
               './assets/fonts/inter/InterVariable.woff2',
               './assets/fonts/inter/InterVariable-Italic.woff2',
-              // Android only
               './assets/fonts/inter/Inter-Regular.otf',
               './assets/fonts/inter/Inter-Italic.otf',
               './assets/fonts/inter/Inter-Medium.otf',
@@ -275,22 +262,22 @@ module.exports = function (_config) {
           {
             ios: {
               enableFullScreenImage_legacy: true,
-              backgroundColor: '#006AFF',
+              backgroundColor: '#000000',
               image: './assets/splash/splash.png',
               resizeMode: 'cover',
               dark: {
                 enableFullScreenImage_legacy: true,
-                backgroundColor: '#002861',
+                backgroundColor: '#000000',
                 image: './assets/splash/splash-dark.png',
                 resizeMode: 'cover',
               },
             },
             android: {
-              backgroundColor: '#006AFF',
+              backgroundColor: '#000000',
               image: './assets/splash/android-splash-logo-white.png',
               imageWidth: 102,
               dark: {
-                backgroundColor: '#002861',
+                backgroundColor: '#000000',
                 image: './assets/splash/android-splash-logo-white.png',
                 imageWidth: 102,
               },
@@ -308,51 +295,6 @@ module.exports = function (_config) {
             default_dark: {
               ios: './assets/app-icons/ios_icon_legacy_dark.png',
               android: './assets/app-icons/android_icon_legacy_dark.png',
-              prerendered: true,
-            },
-            core_aurora: {
-              ios: './assets/app-icons/ios_icon_core_aurora.png',
-              android: './assets/app-icons/android_icon_core_aurora.png',
-              prerendered: true,
-            },
-            core_bonfire: {
-              ios: './assets/app-icons/ios_icon_core_bonfire.png',
-              android: './assets/app-icons/android_icon_core_bonfire.png',
-              prerendered: true,
-            },
-            core_sunrise: {
-              ios: './assets/app-icons/ios_icon_core_sunrise.png',
-              android: './assets/app-icons/android_icon_core_sunrise.png',
-              prerendered: true,
-            },
-            core_sunset: {
-              ios: './assets/app-icons/ios_icon_core_sunset.png',
-              android: './assets/app-icons/android_icon_core_sunset.png',
-              prerendered: true,
-            },
-            core_midnight: {
-              ios: './assets/app-icons/ios_icon_core_midnight.png',
-              android: './assets/app-icons/android_icon_core_midnight.png',
-              prerendered: true,
-            },
-            core_flat_blue: {
-              ios: './assets/app-icons/ios_icon_core_flat_blue.png',
-              android: './assets/app-icons/android_icon_core_flat_blue.png',
-              prerendered: true,
-            },
-            core_flat_white: {
-              ios: './assets/app-icons/ios_icon_core_flat_white.png',
-              android: './assets/app-icons/android_icon_core_flat_white.png',
-              prerendered: true,
-            },
-            core_flat_black: {
-              ios: './assets/app-icons/ios_icon_core_flat_black.png',
-              android: './assets/app-icons/android_icon_core_flat_black.png',
-              prerendered: true,
-            },
-            core_classic: {
-              ios: './assets/app-icons/ios_icon_core_classic.png',
-              android: './assets/app-icons/android_icon_core_classic.png',
               prerendered: true,
             },
           },
@@ -403,5 +345,4 @@ module.exports = function (_config) {
       },
     },
   }
-  
 }
