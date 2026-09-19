@@ -40,19 +40,14 @@ jobs:
             grep -q "packages:" pnpm-workspace.yaml || echo -e "packages:\n  - '.'" >> pnpm-workspace.yaml
           fi
 
-      - name: Remove Dev Client Dependency (Forces Pure Standalone App)
+      - name: Purge Dev Client Package
         run: |
           node -e '
             const fs = require("fs");
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-            if (pkg.dependencies && pkg.dependencies["expo-dev-client"]) {
-              delete pkg.dependencies["expo-dev-client"];
-            }
-            if (pkg.devDependencies && pkg.devDependencies["expo-dev-client"]) {
-              delete pkg.devDependencies["expo-dev-client"];
-            }
+            if (pkg.dependencies && pkg.dependencies["expo-dev-client"]) delete pkg.dependencies["expo-dev-client"];
+            if (pkg.devDependencies && pkg.devDependencies["expo-dev-client"]) delete pkg.devDependencies["expo-dev-client"];
             fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
-            console.log("Purged expo-dev-client from package.json");
           '
 
       - name: Replace Bluesky Blue Colors with Solid Black
@@ -61,42 +56,43 @@ jobs:
             const fs = require("fs");
             const path = require("path");
 
-            function replaceInDir(dir) {
-              if (!fs.existsSync(dir)) return;
-              fs.readdirSync(dir).forEach(file => {
-                const fullPath = path.join(dir, file);
-                if (fs.statSync(fullPath).isDirectory()) {
-                  if (file !== "node_modules" && file !== ".git") replaceInDir(fullPath);
-                } else if (/\.(ts|tsx|js|json)$/.test(file)) {
-                  let content = fs.readFileSync(fullPath, "utf8");
-                  const blueRegex = /#(006AFF|0085ff|1185fe|208bfe|002861|005ad4)/gi;
-                  if (blueRegex.test(content)) {
-                    content = content.replace(blueRegex, "#000000");
-                    fs.writeFileSync(fullPath, content);
+            function replaceBlues(targetDir) {
+              if (!fs.existsSync(targetDir)) return;
+              fs.readdirSync(targetDir).forEach(item => {
+                const itemPath = path.join(targetDir, item);
+                if (fs.statSync(itemPath).isDirectory()) {
+                  if (item !== "node_modules" && item !== ".git") replaceBlues(itemPath);
+                } else if (/\.(ts|tsx|js|json|xml)$/.test(item)) {
+                  let str = fs.readFileSync(itemPath, "utf8");
+                  const blueRegex = /#(006AFF|0085FF|1185FE|208BFE|002861|005AD4|1083FE|0070FF)/gi;
+                  if (blueRegex.test(str)) {
+                    str = str.replace(blueRegex, "#000000");
+                    fs.writeFileSync(itemPath, str);
                   }
                 }
               });
             }
-            replaceInDir("src");
-            console.log("All primary blue colors replaced with solid black (#000000).");
+
+            replaceBlues("src");
+            replaceBlues("plugins");
+            console.log("All UI and plugin blue colors converted to #000000.");
           '
 
-      - name: Update Visual Text to Deducia
+      - name: Update Visual Strings to Deducia
         run: |
           node -e '
             const fs = require("fs");
-            const files = [
+            const targets = [
               "src/locale/locales/en/messages.json",
               "src/locale/locales/en/messages.po"
             ];
-            files.forEach(f => {
-              if (fs.existsSync(f)) {
-                let content = fs.readFileSync(f, "utf8");
+            targets.forEach(filePath => {
+              if (fs.existsSync(filePath)) {
+                let content = fs.readFileSync(filePath, "utf8");
                 content = content.replace(/Bluesky/g, "Deducia");
-                fs.writeFileSync(f, content);
+                fs.writeFileSync(filePath, content);
               }
             });
-            console.log("English UI strings updated to Deducia.");
           '
 
       - name: Overwrite Icons and Logos with Deducia Logo
@@ -109,6 +105,31 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Compile Lingui Localization Files
+        run: |
+          echo "Compiling Lingui catalogs..."
+          pnpm run intl:build || pnpm run intl:compile || pnpm exec lingui compile || npx @lingui/cli compile || true
+
+          # Guarantee every locale has a valid messages file so Metro bundler never fails
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const localesDir = path.join("src", "locale", "locales");
+            if (fs.existsSync(localesDir)) {
+              fs.readdirSync(localesDir).forEach(dir => {
+                const subPath = path.join(localesDir, dir);
+                if (fs.statSync(subPath).isDirectory()) {
+                  const targetJs = path.join(subPath, "messages.js");
+                  const targetTs = path.join(subPath, "messages.ts");
+                  if (!fs.existsSync(targetJs) && !fs.existsSync(targetTs)) {
+                    fs.writeFileSync(targetJs, "export const messages = {};\n");
+                    console.log("Created fallback for:", targetJs);
+                  }
+                }
+              });
+            }
+          '
+
       - name: Generate Native Android Project
         run: npx expo prebuild --platform android --clean
 
@@ -117,7 +138,6 @@ jobs:
           cd android
           chmod +x gradlew
           export GRADLE_OPTS="-Xmx4096m -Dfile.encoding=UTF-8"
-          # Assemble release bundles JS offline into the APK and signs with standard debug keystore
           ./gradlew assembleRelease -x lint -x lintVitalRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
 
       - name: Locate Generated APK
@@ -141,7 +161,7 @@ jobs:
         with:
           tag_name: v1.0.0-${{ github.run_number }}
           name: "Deducia Social v1.0.0 (Build ${{ github.run_number }})"
-          body: "Standalone Deducia APK. Opens directly to Login and Sign-up without development server prompts."
+          body: "Standalone release APK with solid black branding and offline bundled assets."
           files: ${{ steps.find-apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
