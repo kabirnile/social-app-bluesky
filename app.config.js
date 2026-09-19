@@ -44,7 +44,7 @@ module.exports = function (_config) {
         policy: 'appVersion',
       },
       icon: './assets/app-icons/ios_icon_default_next.png',
-      userInterfaceStyle: 'automatic',
+      userInterfaceStyle: 'dark',
       primaryColor: '#000000',
       ios: {
         supportsTablet: false,
@@ -79,61 +79,14 @@ module.exports = function (_config) {
           'com.apple.developer.usernotifications.communication': true,
           'com.apple.developer.declared-age-range': true,
         },
-        privacyManifests: {
-          NSPrivacyCollectedDataTypes: [
-            {
-              NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeCrashData',
-              NSPrivacyCollectedDataTypeLinked: false,
-              NSPrivacyCollectedDataTypeTracking: false,
-              NSPrivacyCollectedDataTypePurposes: [
-                'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-              ],
-            },
-            {
-              NSPrivacyCollectedDataType:
-                'NSPrivacyCollectedDataTypePerformanceData',
-              NSPrivacyCollectedDataTypeLinked: false,
-              NSPrivacyCollectedDataTypeTracking: false,
-              NSPrivacyCollectedDataTypePurposes: [
-                'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-              ],
-            },
-            {
-              NSPrivacyCollectedDataType:
-                'NSPrivacyCollectedDataTypeOtherDiagnosticData',
-              NSPrivacyCollectedDataTypeLinked: false,
-              NSPrivacyCollectedDataTypeTracking: false,
-              NSPrivacyCollectedDataTypePurposes: [
-                'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-              ],
-            },
-          ],
-          NSPrivacyAccessedAPITypes: [
-            {
-              NSPrivacyAccessedAPIType:
-                'NSPrivacyAccessedAPICategoryFileTimestamp',
-              NSPrivacyAccessedAPITypeReasons: ['C617.1', '3B52.1', '0A2A.1'],
-            },
-            {
-              NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryDiskSpace',
-              NSPrivacyAccessedAPITypeReasons: ['E174.1', '85F4.1'],
-            },
-            {
-              NSPrivacyAccessedAPIType:
-                'NSPrivacyAccessedAPICategorySystemBootTime',
-              NSPrivacyAccessedAPITypeReasons: ['35F9.1'],
-            },
-            {
-              NSPrivacyAccessedAPIType:
-                'NSPrivacyAccessedAPICategoryUserDefaults',
-              NSPrivacyAccessedAPITypeReasons: ['CA92.1', '1C8F.1'],
-            },
-          ],
-        },
       },
       androidStatusBar: {
         barStyle: 'light-content',
         backgroundColor: '#000000',
+      },
+      androidNavigationBar: {
+        backgroundColor: '#000000',
+        barStyle: 'light-content',
       },
       android: {
         icon: './assets/app-icons/android_icon_default_next.png',
@@ -264,22 +217,22 @@ module.exports = function (_config) {
               enableFullScreenImage_legacy: true,
               backgroundColor: '#000000',
               image: './assets/splash/splash.png',
-              resizeMode: 'cover',
+              resizeMode: 'contain',
               dark: {
                 enableFullScreenImage_legacy: true,
                 backgroundColor: '#000000',
-                image: './assets/splash/splash-dark.png',
-                resizeMode: 'cover',
+                image: './assets/splash/splash.png',
+                resizeMode: 'contain',
               },
             },
             android: {
               backgroundColor: '#000000',
               image: './assets/splash/android-splash-logo-white.png',
-              imageWidth: 102,
+              imageWidth: 120,
               dark: {
                 backgroundColor: '#000000',
                 image: './assets/splash/android-splash-logo-white.png',
-                imageWidth: 102,
+                imageWidth: 120,
               },
             },
           },
@@ -288,8 +241,8 @@ module.exports = function (_config) {
           '@bsky.app/expo-dynamic-app-icon',
           {
             default_light: {
-              ios: './assets/app-icons/ios_icon_legacy_light.png',
-              android: './assets/app-icons/android_icon_legacy_light.png',
+              ios: './assets/app-icons/ios_icon_legacy_dark.png',
+              android: './assets/app-icons/android_icon_legacy_dark.png',
               prerendered: true,
             },
             default_dark: {
