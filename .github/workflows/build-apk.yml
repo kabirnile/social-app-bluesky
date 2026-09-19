@@ -52,11 +52,22 @@ jobs:
             }
           '
 
-      - name: Apply Deducia Visual, Color & Link Branding
+      - name: Apply Deducia Visual, Color, Link Branding & Logo Base64 Injection
         run: |
           cat << 'EOF' > patch_branding.js
           const fs = require('fs');
           const path = require('path');
+
+          // 1. Read ic_launcher.png (or deducia-logo.png) as Base64 so Metro never needs file path resolution
+          let logoBase64 = '';
+          const logoCandidates = ['ic_launcher.png', 'deducia-logo.png'];
+          for (const f of logoCandidates) {
+            if (fs.existsSync(f)) {
+              logoBase64 = 'data:image/png;base64,' + fs.readFileSync(f).toString('base64');
+              console.log('Successfully encoded logo into Base64 from:', f);
+              break;
+            }
+          }
 
           function walkDir(dir, callback) {
             if (!fs.existsSync(dir)) return;
@@ -77,11 +88,14 @@ jobs:
             let content = fs.readFileSync(filePath, 'utf8');
             let changed = false;
 
-            // 1. Reroute Terms of Service, Privacy Policy, Help, and Feedback links
+            // 2. Reroute Terms of Service, Privacy Policy, Help, and Feedback links
             const bskyLinks = [
               /https:\/\/(?:bsky\.app|bsky\.social)\/about\/(?:support\/)?(?:tos|privacy-policy)[^\s"'`)]*/gi,
+              /https:\/\/(?:www\.)?blueskyweb\.xyz[^\s"'`)]*/gi,
+              /https:\/\/(?:[a-zA-Z0-9-]+\.)?zendesk\.com[^\s"'`)]*/gi,
               /https:\/\/blueskyweb\.zendesk\.com[^\s"'`)]*/gi,
-              /https:\/\/blueskyweb\.xyz[^\s"'`)]*/gi
+              /https:\/\/support\.bsky\.app[^\s"'`)]*/gi,
+              /https:\/\/bsky\.app\/support[^\s"'`)]*/gi
             ];
             bskyLinks.forEach(regex => {
               if (regex.test(content)) {
@@ -99,14 +113,14 @@ jobs:
               changed = true;
             }
 
-            // 2. Convert all blue shades to solid black (#000000)
+            // 3. Convert all blue shades to solid black (#000000)
             const blueRegex = /#(006AFF|0085FF|1185FE|208BFE|002861|005AD4|1083FE|0070FF|0066FF|0A7AFF|1D9BF0|0057CC|2B82EC|1D7BE8|1B85F3)/gi;
             if (blueRegex.test(content)) {
               content = content.replace(blueRegex, '#000000');
               changed = true;
             }
 
-            // 3. Update visible names while preserving underlying packages
+            // 4. Update visible text names to Deducia
             if (!filePath.endsWith('package.json')) {
               if (content.includes('Bluesky Social')) {
                 content = content.replace(/Bluesky Social/g, 'Deducia Social');
@@ -118,21 +132,24 @@ jobs:
               }
             }
 
-            // 4. Replace butterfly logo components with Fox icon
-            if (/Logo(type)?\.(tsx|ts|jsx|js)$/.test(filePath)) {
-              if (content.includes('<Svg') || content.includes('Butterfly') || content.includes('path')) {
+            // 5. Replace butterfly logo vectors with Base64 Logo (eliminates require path errors)
+            if (/(Logo(type)?|Butterfly)\.(tsx|ts|jsx|js)$/.test(filePath)) {
+              if (logoBase64) {
                 content = `
           import React from "react";
           import { Image } from "react-native";
-          export function Logo({ width = 28, fill, style }: any) {
+          const LOGO_URI = "${logoBase64}";
+          export function Logo({ width = 28, height, fill, style }: any) {
+            const size = width || 28;
             return (
               <Image
-                source={require("../../assets/app-icons/android_icon_default_next.png")}
-                style={[{ width: width, height: width, resizeMode: "contain" }, style]}
+                source={{ uri: LOGO_URI }}
+                style={[{ width: size, height: height || size, resizeMode: "contain" }, style]}
               />
             );
           }
           export const Logotype = Logo;
+          export const Butterfly = Logo;
           export default Logo;
           `;
                 changed = true;
@@ -144,7 +161,7 @@ jobs:
             }
           });
 
-          // 5. Update localization catalogs
+          // 6. Update English localization strings
           const localeFiles = [
             'src/locale/locales/en/messages.json',
             'src/locale/locales/en/messages.po'
@@ -165,14 +182,16 @@ jobs:
       - name: Replace Welcome Screen Background
         run: |
           if [ -f "deducia-welcome.png" ]; then
-            echo "Applying deducia-welcome.png to welcome and auth screens..."
-            find assets -type f \( -iname "*signin*" -o -iname "*signup*" -o -iname "*wallpaper*" -o -iname "*welcome*" -o -iname "*illustration*" -o -iname "*cover*" \) -exec cp -f deducia-welcome.png "{}" \;
-            find assets -type f -name "*.png" ! -name "*icon*" ! -name "*splash*" -size +40k -exec cp -f deducia-welcome.png "{}" \;
+            echo "Applying deducia-welcome.png to welcome screen illustrations..."
+            find assets -type f \( -iname "*signin*" -o -iname "*signup*" -o -iname "*wallpaper*" -o -iname "*welcome*" -o -iname "*illustration*" -o -iname "*cover*" -o -iname "*park*" \) -exec cp -f deducia-welcome.png "{}" \;
+            find assets -type f -name "*.png" ! -name "*icon*" ! -name "*splash*" ! -name "*notification*" -size +30k -exec cp -f deducia-welcome.png "{}" \;
+            find src -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.webp" \) ! -name "*icon*" ! -name "*splash*" -exec cp -f deducia-welcome.png "{}" \;
+            echo "Welcome background updated."
           else
-            echo "deducia-welcome.png not found. Skipping."
+            echo "deducia-welcome.png not found. Keeping default."
           fi
 
-      - name: Replace App Icons and Logos
+      - name: Replace App Icons and Splash Screens
         run: |
           LOGO_SOURCE=""
           if [ -f "ic_launcher.png" ]; then
@@ -244,7 +263,7 @@ jobs:
         with:
           tag_name: v1.0.0-${{ github.run_number }}
           name: "Deducia Social v1.0.0 (Build ${{ github.run_number }})"
-          body: "Standalone Deducia APK with custom welcome background, Fox icon, solid black accents, and deducia.com links."
+          body: "Standalone Deducia APK with Fox icon, solid black accents, custom welcome screen, and deducia.com links."
           files: ${{ steps.find-apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
