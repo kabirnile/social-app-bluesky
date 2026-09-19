@@ -44,62 +44,156 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
-            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-            if (pkg.dependencies && pkg.dependencies["expo-dev-client"]) delete pkg.dependencies["expo-dev-client"];
-            if (pkg.devDependencies && pkg.devDependencies["expo-dev-client"]) delete pkg.devDependencies["expo-dev-client"];
-            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
+            if (fs.existsSync("package.json")) {
+              const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+              if (pkg.dependencies && pkg.dependencies["expo-dev-client"]) delete pkg.dependencies["expo-dev-client"];
+              if (pkg.devDependencies && pkg.devDependencies["expo-dev-client"]) delete pkg.devDependencies["expo-dev-client"];
+              fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
+            }
           '
 
-      - name: Replace Bluesky Blue Colors with Solid Black
+      - name: Replace Welcome Screen Photo (Front Illustration)
+        run: |
+          if [ -f "deducia-welcome.png" ]; then
+            echo "Replacing welcome background and sign-in illustrations with deducia-welcome.png..."
+            # Overwrite all auth and signin illustrations in assets
+            find assets -type f \( -iname "*signin*" -o -iname "*signup*" -o -iname "*wallpaper*" -o -iname "*welcome*" -o -iname "*illustration*" -o -iname "*cover*" \) -exec cp -f deducia-welcome.png "{}" \;
+            
+            # Find large non-icon images in assets and replace matching backgrounds
+            find assets -type f -name "*.png" ! -name "*icon*" ! -name "*splash*" -size +40k -exec cp -f deducia-welcome.png "{}" \;
+            echo "Welcome front photo updated successfully."
+          else
+            echo "deducia-welcome.png not found in root. Skipping welcome screen image replacement."
+          fi
+
+      - name: Update Links, External URLs & Visual Names
         run: |
           node -e '
             const fs = require("fs");
             const path = require("path");
 
-            function replaceBlues(targetDir) {
-              if (!fs.existsSync(targetDir)) return;
-              fs.readdirSync(targetDir).forEach(item => {
-                const itemPath = path.join(targetDir, item);
-                if (fs.statSync(itemPath).isDirectory()) {
-                  if (item !== "node_modules" && item !== ".git") replaceBlues(itemPath);
-                } else if (/\.(ts|tsx|js|json|xml)$/.test(item)) {
-                  let str = fs.readFileSync(itemPath, "utf8");
-                  const blueRegex = /#(006AFF|0085FF|1185FE|208BFE|002861|005AD4|1083FE|0070FF)/gi;
-                  if (blueRegex.test(str)) {
-                    str = str.replace(blueRegex, "#000000");
-                    fs.writeFileSync(itemPath, str);
+            function updateSourceFiles(dir) {
+              if (!fs.existsSync(dir)) return;
+              fs.readdirSync(dir).forEach(item => {
+                const fullPath = path.join(dir, item);
+                if (fs.statSync(fullPath).isDirectory()) {
+                  if (item !== "node_modules" && item !== ".git") updateSourceFiles(fullPath);
+                } else if (/\.(ts|tsx|js|json|po)$/.test(item)) {
+                  let content = fs.readFileSync(fullPath, "utf8");
+                  let changed = false;
+
+                  // 1. Reroute terms, privacy, help, feedback, and support links
+                  const linkRegex = /https:\/\/(bsky\.app\/about\/(?:support\/)?(?:tos|privacy-policy)|bsky\.social\/about\/(?:support\/)?(?:tos|privacy-policy)|blueskyweb\.zendesk\.com[^\s"'\`\)]*|blueskyweb\.xyz[^\s"'\`\)]*)/gi;
+                  if (linkRegex.test(content)) {
+                    content = content.replace(linkRegex, "https://deducia.com/social/links");
+                    changed = true;
+                  }
+
+                  // 2. Replace hardcoded constant URLs for feedback & legal docs
+                  if (content.includes("HELP_DESK_URL") || content.includes("FEEDBACK_URL")) {
+                    content = content.replace(/HELP_DESK_URL\s*=\s*['"][^'"]+['"]/g, "HELP_DESK_URL = '\''https://deducia.com/social/links'\''");
+                    content = content.replace(/FEEDBACK_URL\s*=\s*['"][^'"]+['"]/g, "FEEDBACK_URL = '\''https://deducia.com/social/links'\''");
+                    changed = true;
+                  }
+
+                  // 3. Update user-facing brand strings while avoiding @atproto packages
+                  if (!item.endsWith("package.json")) {
+                    if (content.includes("Bluesky Social")) {
+                      content = content.replace(/Bluesky Social/g, "Deducia Social");
+                      changed = true;
+                    }
+                    // Replace visible UI text
+                    const uiTextRegex = />Bluesky</g;
+                    if (uiTextRegex.test(content)) {
+                      content = content.replace(uiTextRegex, ">Deducia<");
+                      changed = true;
+                    }
+                  }
+
+                  if (changed) {
+                    fs.writeFileSync(fullPath, content);
                   }
                 }
               });
             }
 
-            replaceBlues("src");
-            replaceBlues("plugins");
-            console.log("All UI and plugin blue colors converted to #000000.");
+            updateSourceFiles("src");
+            console.log("Visual strings and legal/support links updated.");
           '
 
-      - name: Update Visual Strings to Deducia
+      - name: Replace In-App Butterfly Logos with Deducia Logo
         run: |
           node -e '
             const fs = require("fs");
-            const targets = [
-              "src/locale/locales/en/messages.json",
-              "src/locale/locales/en/messages.po"
-            ];
-            targets.forEach(filePath => {
-              if (fs.existsSync(filePath)) {
-                let content = fs.readFileSync(filePath, "utf8");
-                content = content.replace(/Bluesky/g, "Deducia");
-                fs.writeFileSync(filePath, content);
-              }
-            });
+            const path = require("path");
+
+            function patchLogoComponents(dir) {
+              if (!fs.existsSync(dir)) return;
+              fs.readdirSync(dir).forEach(file => {
+                const fullPath = path.join(dir, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                  if (file !== "node_modules" && file !== ".git") patchLogoComponents(fullPath);
+                } else if (/Logo(type)?\.(tsx|ts|jsx|js)$/.test(file)) {
+                  let str = fs.readFileSync(fullPath, "utf8");
+                  // If component renders an SVG butterfly, inject Deducia image component
+                  if (str.includes("<Svg") || str.includes("path") || str.includes("Butterfly")) {
+                    str = `
+                      import React from "react";
+                      import { Image } from "react-native";
+                      export function Logo({ width = 28, fill, style }: any) {
+                        return (
+                          <Image
+                            source={require("../../assets/app-icons/android_icon_default_next.png")}
+                            style={[{ width: width, height: width, resizeMode: "contain" }, style]}
+                          />
+                        );
+                      }
+                      export const Logotype = Logo;
+                      export default Logo;
+                    `;
+                    fs.writeFileSync(fullPath, str);
+                    console.log("Replaced logo vector with Deducia logo image in:", fullPath);
+                  }
+                }
+              });
+            }
+
+            patchLogoComponents("src");
           '
 
-      - name: Overwrite Icons and Logos with Deducia Logo
+      - name: Strictly Convert Blue Colors to Solid Black & Monochrome
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+
+            function purgeBlues(dir) {
+              if (!fs.existsSync(dir)) return;
+              fs.readdirSync(dir).forEach(file => {
+                const fullPath = path.join(dir, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                  if (file !== "node_modules" && file !== ".git") purgeBlues(fullPath);
+                } else if (/\.(ts|tsx|js|json|xml)$/.test(file)) {
+                  let content = fs.readFileSync(fullPath, "utf8");
+                  const blueShades = /#(006AFF|0085FF|1185FE|208BFE|002861|005AD4|1083FE|0070FF|0066FF|0A7AFF|1D9BF0|0057CC|2B82EC|1D7BE8|1B85F3)/gi;
+                  if (blueShades.test(content)) {
+                    content = content.replace(blueShades, "#000000");
+                    fs.writeFileSync(fullPath, content);
+                  }
+                }
+              });
+            }
+
+            purgeBlues("src");
+            purgeBlues("plugins");
+            console.log("Strictly replaced all blue hex shades with #000000.");
+          '
+
+      - name: Overwrite Launcher and Splash Icons with Deducia Logo
         run: |
           if [ -f "deducia-logo.png" ]; then
-            echo "Replacing icons and splash images with deducia-logo.png..."
             find assets -type f \( -name "*icon*.png" -o -name "*splash*.png" \) -exec cp -f deducia-logo.png "{}" \;
+            echo "Updated app icons and splash assets."
           fi
 
       - name: Install Dependencies
@@ -107,23 +201,22 @@ jobs:
 
       - name: Compile Lingui Localization Files
         run: |
-          echo "Compiling Lingui catalogs..."
+          echo "Building localization messages..."
           pnpm run intl:build || pnpm run intl:compile || pnpm exec lingui compile || npx @lingui/cli compile || true
 
-          # Guarantee every locale has a valid messages file so Metro bundler never fails
+          # Create fallbacks for all locales so Metro bundle never errors out
           node -e '
             const fs = require("fs");
             const path = require("path");
             const localesDir = path.join("src", "locale", "locales");
             if (fs.existsSync(localesDir)) {
               fs.readdirSync(localesDir).forEach(dir => {
-                const subPath = path.join(localesDir, dir);
-                if (fs.statSync(subPath).isDirectory()) {
-                  const targetJs = path.join(subPath, "messages.js");
-                  const targetTs = path.join(subPath, "messages.ts");
+                const sub = path.join(localesDir, dir);
+                if (fs.statSync(sub).isDirectory()) {
+                  const targetJs = path.join(sub, "messages.js");
+                  const targetTs = path.join(sub, "messages.ts");
                   if (!fs.existsSync(targetJs) && !fs.existsSync(targetTs)) {
                     fs.writeFileSync(targetJs, "export const messages = {};\n");
-                    console.log("Created fallback for:", targetJs);
                   }
                 }
               });
@@ -161,7 +254,7 @@ jobs:
         with:
           tag_name: v1.0.0-${{ github.run_number }}
           name: "Deducia Social v1.0.0 (Build ${{ github.run_number }})"
-          body: "Standalone release APK with solid black branding and offline bundled assets."
+          body: "Standalone Deducia APK with customized welcome background, black accents, and deducia.com links."
           files: ${{ steps.find-apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
